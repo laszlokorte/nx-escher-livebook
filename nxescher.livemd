@@ -1,0 +1,243 @@
+<!-- livebook:{"file_entries":[{"name":"house.png","type":"attachment"}]} -->
+
+# Escher
+
+```elixir
+Mix.install([
+  {:nx, "~> 0.11.0"},
+  {:kino, "~> 0.19.0"},
+  {:image, "~> 0.62.1"},
+  {:kino_vega_lite, "~> 0.1.9"},
+  {:tucan, "~> 0.5.1"},
+  {:kino_zoetrope, "~> 0.21.0"}
+])
+
+Kino.nothing()
+```
+
+## Droste
+
+```elixir
+droste =
+  with {:ok, droste_file} <- Image.open(Kino.FS.file_path("house.png")),
+       {:ok, droste_bin} <- Vix.Vips.Image.write_to_binary(droste_file) do
+    droste_bin
+    |> Nx.from_binary(:u8)
+    |> Nx.reshape({1,256, 256, 4})
+    |> Nx.mean(axes: [3])
+  end
+
+droste
+|> KinoZoetrope.TensorStack.new(
+  titel: "A droste image",
+  size: 500,
+  resize: true,
+  markers: [
+    %{
+      attrs: %{
+        "fill" => "red"
+      },
+      for: [0, 1, 2],
+      points: [{455, 455}]
+    }
+  ]
+)
+```
+
+```elixir
+defmodule PolarMap do
+  def map(img, fun, debug \\ false) do
+    map(img, 0..0, fn i, _s -> fun.(i) end, debug)
+  end
+
+  def map(img, steps, fun, debug) do
+    for s <- steps do
+      {1, h, w} = Nx.shape(img)
+
+      x =
+        Nx.iota({1, w, 1})
+        |> Nx.broadcast({h, w, 1})
+        |> Nx.divide(w)
+
+      y =
+        Nx.iota({h, 1, 1})
+        |> Nx.broadcast({h, w, 1})
+        |> Nx.divide(h)
+
+      pos =
+        Nx.complex(x, y) |> fun.(s)
+
+      mapped_x = Nx.real(pos) |> Nx.multiply(w)
+
+      mapped_y = Nx.imag(pos) |> Nx.multiply(h)
+
+      x_floored =
+        mapped_x
+        |> Nx.floor()
+        |> Nx.as_type({:s, 32})
+        |> Nx.clip(0, w - 1)
+
+      y_floored =
+        mapped_y
+        |> Nx.floor()
+        |> Nx.as_type({:s, 32})
+        |> Nx.clip(0, h - 1)
+
+      x_ceiled =
+        mapped_x
+        |> Nx.ceil()
+        |> Nx.as_type({:s, 32})
+        |> Nx.clip(0, w - 1)
+
+      y_ceiled =
+        mapped_y
+        |> Nx.ceil()
+        |> Nx.as_type({:s, 32})
+        |> Nx.clip(0, h - 1)
+
+      x_frac = mapped_x |> Nx.as_type({:f, 32}) |> Nx.subtract(Nx.floor(mapped_x))
+      y_frac = mapped_y |> Nx.as_type({:f, 32}) |> Nx.subtract(Nx.floor(mapped_y))
+
+      xy00 = y_floored |> Nx.multiply(w) |> Nx.add(x_floored)
+      xy10 = y_floored |> Nx.multiply(w) |> Nx.add(x_ceiled)
+      xy01 = y_ceiled |> Nx.multiply(w) |> Nx.add(x_floored)
+      xy11 = y_ceiled |> Nx.multiply(w) |> Nx.add(x_ceiled)
+
+      img_mapped_00 = img |> Nx.reshape({:auto}) |> Nx.take(xy00) |> Nx.reshape({h, w, 1})
+      img_mapped_10 = img |> Nx.reshape({:auto}) |> Nx.take(xy10) |> Nx.reshape({h, w, 1})
+      img_mapped_01 = img |> Nx.reshape({:auto}) |> Nx.take(xy01) |> Nx.reshape({h, w, 1})
+      img_mapped_11 = img |> Nx.reshape({:auto}) |> Nx.take(xy11) |> Nx.reshape({h, w, 1})
+
+      img_mapped_y0 =
+        Nx.add(
+          Nx.multiply(img_mapped_01, y_frac),
+          Nx.multiply(img_mapped_00, Nx.subtract(1, y_frac))
+        )
+
+      img_mapped_y1 =
+        Nx.add(
+          Nx.multiply(img_mapped_11, y_frac),
+          Nx.multiply(img_mapped_10, Nx.subtract(1, y_frac))
+        )
+
+      img_mapped =
+        Nx.add(
+          Nx.multiply(img_mapped_y1, x_frac),
+          Nx.multiply(img_mapped_y0, Nx.subtract(1, x_frac))
+        )
+        |> Nx.reshape({1, h, w, 1})
+
+      if debug do
+        coord_mapped_x =
+          Nx.add(
+            Nx.multiply(x_ceiled, x_frac),
+            Nx.multiply(x_floored, Nx.subtract(1, x_frac))
+          )
+
+        coord_mapped_y =
+          Nx.add(
+            Nx.multiply(y_ceiled, y_frac),
+            Nx.multiply(y_floored, Nx.subtract(1, y_frac))
+          )
+
+        Nx.concatenate(
+          [
+            Nx.broadcast(0, {h, w, 1}),
+            coord_mapped_x |> Nx.divide(w) |> Nx.multiply(255),
+            coord_mapped_y |> Nx.divide(h) |> Nx.multiply(255),
+            Nx.broadcast(255, {h, w, 1})
+          ],
+          axis: 2
+        )
+        |> Nx.reshape({1, h, w, 4})
+      else
+        img_mapped
+      end
+    end
+  end
+end
+
+Kino.nothing()
+```
+
+```elixir
+droste =
+  with {:ok, droste_file} <- Image.open(Kino.FS.file_path("house.png")),
+       {:ok, droste_bin} <- Vix.Vips.Image.write_to_binary(droste_file) do
+    droste_bin
+    |> Nx.from_binary(:u8)
+    |> Nx.reshape({1, 256, 256, 4})
+    |> Nx.mean(axes: [3])
+  end
+
+escherAngle = 0.463776890039444
+escherScale = 1.117768667936325
+zoomFactor = 16
+zoom = 1
+zoomCenter = Nx.complex(-0.001, -0.001)
+
+[
+  droste,
+  PolarMap.map(
+    droste,
+    fn z ->
+      centered = z |> Nx.subtract(Nx.complex(0.5, 0.5)) |> Nx.add(Nx.Constants.epsilon(:f32))
+
+      uvPolar =
+        Nx.complex(
+          Nx.log(Nx.abs(centered)) |> Nx.divide(Nx.log(zoomFactor)),
+          Nx.phase(centered) |> Nx.divide(Nx.Constants.pi())
+        )
+        |> Nx.divide(2)
+
+      zoomInLog =
+        Nx.complex(1, 0)
+        |> Nx.multiply(Nx.exp(Nx.complex(0, escherAngle |> Nx.negate())))
+        |> Nx.multiply(zoom * 0.1)
+
+      rotated = uvPolar |> Nx.add(zoomInLog) |> Nx.multiply(Nx.exp(Nx.complex(0, escherAngle)))
+      rotScaled = rotated |> Nx.multiply(escherScale) |> Nx.subtract(Nx.complex(0.5, 0))
+
+      rad = Nx.remainder(Nx.real(rotScaled) |> Nx.multiply(2), 1.0)
+
+      cartesian =
+        Nx.complex(
+          Nx.cos(Nx.imag(rotScaled) |> Nx.multiply(2) |> Nx.multiply(Nx.Constants.pi())),
+          Nx.sin(Nx.imag(rotScaled) |> Nx.multiply(2) |> Nx.multiply(Nx.Constants.pi()))
+        )
+        |> Nx.multiply(Nx.exp(Nx.log(zoomFactor) |> Nx.multiply(rad)))
+        |> Nx.divide(Nx.log(zoomFactor))
+
+      rescaled =
+        Nx.max(Nx.abs(Nx.real(cartesian)), Nx.abs(Nx.imag(cartesian)))
+        |> Nx.multiply(2)
+        |> Nx.add(Nx.Constants.epsilon(:f32))
+        |> Nx.log()
+        |> Nx.divide(Nx.log(zoomFactor))
+        |> Nx.negate()
+        |> Nx.floor()
+        |> then(&Nx.pow(zoomFactor, &1))
+
+      cartesian |> Nx.multiply(rescaled) |> Nx.add(Nx.complex(0.5, 0.5)) |> Nx.add(zoomCenter)
+    end,
+    false
+  )
+  |> Nx.concatenate()
+]
+|> KinoZoetrope.TensorStack.new(
+  titel: "Polar Transformation",
+  labels: ["Droste Base Image", "Escher Spiral"],
+  cmap: nil,
+  size: 250,
+  legend: false,
+  markers: [
+    %{
+      attrs: %{
+        "fill" => "red"
+      },
+      for: [0, 1, 2],
+      points: [{455, 455}]
+    }
+  ]
+)
+```
