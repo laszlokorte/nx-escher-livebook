@@ -9,10 +9,18 @@ Mix.install([
   {:image, "~> 0.62.1"},
   {:kino_vega_lite, "~> 0.1.9"},
   {:tucan, "~> 0.5.1"},
-  {:kino_zoetrope, "~> 0.21.0"}
+  {:kino_zoetrope, "~> 0.21.0"},
+  {:fine, "0.1.4"},
+  {:exla, "~> 0.11.0"}
 ])
 
 Kino.nothing()
+```
+
+## Config
+
+```elixir
+Nx.global_default_backend(EXLA.Backend)
 ```
 
 ## Droste
