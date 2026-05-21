@@ -4,14 +4,13 @@
 
 ```elixir
 Mix.install([
-  {:nx, "~> 0.11.0"},
+  {:nx, "~> 0.12.0"},
   {:kino, "~> 0.19.0"},
   {:image, "~> 0.62.1"},
   {:kino_vega_lite, "~> 0.1.9"},
   {:tucan, "~> 0.5.1"},
-  {:kino_zoetrope, "~> 0.21.0"},
-  {:fine, "0.1.4"},
-  {:exla, "~> 0.11.0"}
+  {:kino_zoetrope, "~> 0.24.0"},
+  {:exla, "~> 0.12.0"}
 ])
 
 Kino.nothing()
