@@ -9,7 +9,7 @@ Mix.install([
   {:image, "~> 0.62.1"},
   {:kino_vega_lite, "~> 0.1.9"},
   {:tucan, "~> 0.5.1"},
-  {:kino_zoetrope, "~> 0.24.0"},
+  {:kino_zoetrope, "~> 0.25.0"},
   {:exla, "~> 0.12.0"}
 ])
 
@@ -36,7 +36,7 @@ droste =
 
 droste
 |> KinoZoetrope.TensorStack.new(
-  titel: "A droste image",
+  title: "A droste image",
   size: 500,
   resize: true,
   markers: [
@@ -232,7 +232,7 @@ zoomCenter = Nx.complex(-0.001, -0.001)
   |> Nx.concatenate()
 ]
 |> KinoZoetrope.TensorStack.new(
-  titel: "Polar Transformation",
+  title: "Polar Transformation",
   labels: ["Droste Base Image", "Escher Spiral"],
   cmap: nil,
   size: 250,
